@@ -1216,11 +1216,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
             $('#EditcandidateModal .modal-title').text('Edit Candidate');
             $('#EditcandidateModal').modal('show');
-
+            jQuery('.ApWait').show(); 
             $.ajax({
                 url: HRP_URL +'candidates/edit/' + candidateId,
                 type: 'GET',
                 success: function (data) {
+                    jQuery('.ApWait').hide(); 
                     let modal = $('#EditcandidateModal');
                     console.log(data);
                     // Basic fields
@@ -1330,6 +1331,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 },
                 error: function () {
+                    jQuery('.ApWait').hide(); 
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
@@ -1530,28 +1532,61 @@ document.addEventListener('DOMContentLoaded', function () {
                     }, 300);
                     return false;
                 } else {
-                    // Continue with your $.ajax POST to submit form data
-                    $.ajax({
-                        type: 'POST',
-                        url: url,
-                        data: formData,
-                        processData: false,
-                        contentType: false,
-                        success: function () {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Updated',
-                                text: 'Candidate updated successfully.',
-                                timer: 1500,
-                                showConfirmButton: false
-                            });
-                            $('#EditcandidateModal').modal('hide');
-                            location.reload();
-                        },
-                        error: function (xhr) {
-                            handleAjaxValidationErrors(xhr, form);
-                        }
-                    });
+                    jQuery('.ApWait').show();
+
+                        // ✅ Stuck upload detection and friendly error
+                        let uploadTimeout;
+                        let uploadRequest = $.ajax({
+                            type: 'POST',
+                            url: url,
+                            data: formData,
+                            processData: false,
+                            contentType: false,
+                            timeout: 30000, // 30 seconds
+
+                            xhr: function () {
+                                let xhr = new window.XMLHttpRequest();
+                                xhr.upload.addEventListener("progress", function (evt) {
+                                    if (evt.lengthComputable) {
+                                        let percentComplete = Math.round((evt.loaded / evt.total) * 100);
+                                        console.log(percentComplete + '% uploaded');
+                                    }
+                                }, false);
+                                return xhr;
+                            },
+                            success: function () {
+                                clearTimeout(uploadTimeout);
+                                jQuery('.ApWait').hide();
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Success',
+                                    text: 'Candidate added successfully.',
+                                    timer: 1500,
+                                    showConfirmButton: false
+                                });
+                                $('#candidateModal').modal('hide');
+                                form[0].reset();
+                                location.reload();
+                            },
+                            error: function (xhr, textStatus) {
+                                clearTimeout(uploadTimeout);
+                                jQuery('.ApWait').hide();
+
+                                // Clear previous stuck upload error
+                                form.find('.resume-upload-error').remove();
+
+                                if (textStatus === 'timeout') {
+                                    $('<div class="text-danger small error-message resume-upload-error">Upload is taking too long. Please try again.</div>').insertAfter(resumeInput);
+                                } else {
+                                    handleAjaxValidationErrors(xhr, form);
+                                }
+                            }
+                        });
+
+                        // Failsafe manual abort after 35 sec
+                        uploadTimeout = setTimeout(() => {
+                            uploadRequest.abort(); // triggers timeout error
+                        }, 35000);
                 }
             });
         });
@@ -1569,233 +1604,245 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
-$(document).ready(function () {
+    $(document).ready(function () {
 
-        $.ajaxSetup({
-            headers: {
-                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-            }
-        });
-
-        // Phone number: digits only, max 10
-        $('[name="phone_number"], [name="alternate_phone_number"]').on('input', function () {
-            this.value = this.value.replace(/\D/g, '').slice(0, 10);
-        });
-
-
-    $('#candidateForm').on('submit', function (e) {
-        e.preventDefault();
-        let form = $(this);
-        let url = form.attr('action');
-        let formData = new FormData(this);
-
-        // Clear previous errors
-        form.find('.error-message').remove();
-
-        let hasErrors = false;
-
-        // ✅ Validate required fields
-        let requiredFields = [
-            { name: 'first_name', message: 'First name is required.' },
-            { name: 'last_name', message: 'Last name is required.' },
-            { name: 'email', message: 'Email is required.' },
-            { name: 'phone_number', message: 'Phone number is required.' },
-            { name: 'ectc_per_month', message: 'Expected CTC per month is required.' },
-            { name: 'candidate_source', message: 'Candidate source is required.' },
-            { name: 'applied_designation', message: 'Applied designation is required.' },
-            { name: 'stream', message: 'Stream is required.' }
-        ];
-
-        requiredFields.forEach(field => {
-            let input = form.find('[name="' + field.name + '"]');
-            if (input.length && !input.val().trim()) {
-                $('<div class="text-danger small error-message">' + field.message + '</div>').insertAfter(input);
-                hasErrors = true;
-            }
-        });
-
-        // ✅ Validate email format
-        let emailInput = form.find('[name="email"]');
-        let emailVal = emailInput.val().trim();
-        if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
-            $('<div class="text-danger small error-message">Please enter a valid email address.</div>').insertAfter(emailInput);
-            hasErrors = true;
-        }
-
-        // ✅ Phone number validation
-        let phoneInput = form.find('[name="phone_number"]');
-        let phoneVal = phoneInput.val().trim();
-        const phoneRegex = /^[0-9]{10}$/;
-        if (!phoneRegex.test(phoneVal)) {
-            $('<div class="text-danger small error-message">Enter a valid 10-digit phone number.</div>').insertAfter(phoneInput);
-            hasErrors = true;
-        }
-
-        // ✅ Alternate phone validation (if filled)
-        let alternateInput = form.find('[name="alternate_phone_number"]');
-        let alternateVal = alternateInput.val().trim();
-        if (alternateVal) {
-            if (!phoneRegex.test(alternateVal)) {
-                $('<div class="text-danger small error-message">Enter a valid 10-digit alternate phone number.</div>').insertAfter(alternateInput);
-                hasErrors = true;
-            } else if (alternateVal === phoneVal) {
-                $('<div class="text-danger small error-message">Alternate phone number must be different from phone number.</div>').insertAfter(alternateInput);
-                hasErrors = true;
-            }
-        }
-
-        // ✅ LinkedIn URL validation
-        let linkedinInput = form.find('[name="linkedin_url"]');
-        let linkedinVal = linkedinInput.val().trim();
-        const urlRegex = /^(https?:\/\/)([\w-]+\.)+[\w-]+(\/[\w\-._~:/?#[\]@!$&'()*+,;=]*)?$/;
-        if (linkedinVal && !urlRegex.test(linkedinVal)) {
-            $('<div class="text-danger small error-message">The linkedin url field must be a valid URL e.g. https://www.linkedin.com/</div>').insertAfter(linkedinInput);
-            hasErrors = true;
-        }
-
-        // ✅ Validate ECTC is at least 1 more than CTC
-        // let ctcInput = form.find('[name="ctc_per_month"]');
-        // let ectcInput = form.find('[name="ectc_per_month"]');
-        // let ctcVal = parseFloat(ctcInput.val().trim()) || 0;
-        // let ectcVal = parseFloat(ectcInput.val().trim()) || 0;
-        // if (ectcInput.length && ectcVal < ctcVal + 1) {
-        //     $('<div class="text-danger small error-message">Expected CTC must be more than CTC.</div>').insertAfter(ectcInput);
-        //     hasErrors = true;
-        // }
-
-    // ✅ Total Experience Validation
-    let expYearsInput = form.find('[name="total_experience_years"]');
-    let expMonthsInput = form.find('[name="total_experience_months"]');
-
-    let expYearsRaw = expYearsInput.val().trim();
-    let expMonthsRaw = expMonthsInput.val().trim();
-
-    let expYearsVal = expYearsRaw !== "" ? parseInt(expYearsRaw) : null;
-    let expMonthsVal = expMonthsRaw !== "" ? parseInt(expMonthsRaw) : null;
-
-    // If both are entered and both are zero, show error
-    if (expYearsVal !== null && expMonthsVal !== null && expYearsVal === 0 && expMonthsVal === 0) {
-        $('<div class="text-danger small error-message">Enter at least 1 year or 1 month of total experience.</div>').insertAfter(expYearsInput);
-        hasErrors = true;
-    }
-
-    // Validate months if entered
-    if (expMonthsVal !== null && (expMonthsVal < 0 || expMonthsVal > 11)) {
-        $('<div class="text-danger small error-message">Total experience months must be between 0 and 11.</div>').insertAfter(expMonthsInput);
-        hasErrors = true;
-    }
-
-
-    // ✅ Resume file size validation
-    let resumeInput = form.find('[name="resume"]');
-    let resumeFile = resumeInput[0].files[0]; // Get the file object
-
-    if (resumeFile) {
-        let maxSizeMB = 2; // e.g., 2 MB limit
-        let maxSizeBytes = maxSizeMB * 1024 * 1024;
-
-        if (resumeFile.size > maxSizeBytes) {
-            $('<div class="text-danger small error-message">File size should not exceed ' + maxSizeMB + ' MB.</div>')
-                .insertAfter(resumeInput);
-            hasErrors = true;
-        }
-    }
-
-        // ✅ Skill validation (keep your existing skill validation unchanged)
-        let hasSkillErrors = false;
-        $('.skill-item').each(function () {
-            const skillSelect = $(this).find('select');
-            const expYears = $(this).find('input[name*="[exp_years]"]');
-            const expMonths = $(this).find('input[name*="[exp_months]"]');
-
-            const skillVal = skillSelect.val();
-            const yearsVal = expYears.val();
-            const monthsVal = expMonths.val();
-
-            if (!skillVal && (!yearsVal || yearsVal == 0) && (!monthsVal || monthsVal == 0)) {
-                $('<div class="text-danger small error-message">Please fill this skill row or remove it.</div>').insertAfter(skillSelect);
-                hasSkillErrors = true;
-                return;
-            }
-
-            if (skillVal) {
-                if ((parseInt(yearsVal) === 0 || !yearsVal) && (parseInt(monthsVal) === 0 || !monthsVal)) {
-                    $('<div class="text-danger small error-message">Enter at least 1 year or 1 month of experience for this skill.</div>').insertAfter(expYears);
-                    hasSkillErrors = true;
+            $.ajaxSetup({
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                 }
-            } else {
-                if ((yearsVal && yearsVal > 0) || (monthsVal && monthsVal > 0)) {
-                    $('<div class="text-danger small error-message">Please select a skill name for these experience values.</div>').insertAfter(skillSelect);
-                    hasSkillErrors = true;
-                }
-            }
+            });
 
-            if (monthsVal !== "" && (parseInt(monthsVal) < 0 || parseInt(monthsVal) > 11)) {
-                $('<div class="text-danger small error-message">Months must be between 0 and 11.</div>').insertAfter(expMonths);
-                hasSkillErrors = true;
-            }
-        });
+            // Phone number: digits only, max 10
+            $('[name="phone_number"], [name="alternate_phone_number"]').on('input', function () {
+                this.value = this.value.replace(/\D/g, '').slice(0, 10);
+            });
 
-        // ✅ Scroll to first error if local errors exist
-        if (hasErrors || hasSkillErrors) {
-            let firstError = form.find('.error-message').first();
-            if (firstError.length) {
-                let modalBody = form.closest('.modal-body');
-                modalBody.animate({
-                    scrollTop: firstError.offset().top - modalBody.offset().top + modalBody.scrollTop() - 40
-                }, 300);
-            }
-            return false;
-        }
 
-        // ✅ Email uniqueness check via AJAX
-        $.post(HRP_URL+'candidates/check-email-exists', { 
-            email: emailVal, 
-            _token: $('meta[name="csrf-token"]').attr('content')
-        }, function (response) {
-            if (response.exists) {
-                $('<div class="text-danger small error-message">The email has already been taken.</div>').insertAfter(emailInput);
-                let modalBody = form.closest('.modal-body');
-                modalBody.animate({
-                    scrollTop: emailInput.offset().top - modalBody.offset().top + modalBody.scrollTop() - 40
-                }, 300);
-                return false;
-            } else {
-                // ✅ Submit form via AJAX after uniqueness check
-                $.ajax({
-                    type: 'POST',
-                    url: url,
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function () {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Success',
-                            text: 'Candidate added successfully.',
-                            timer: 1500,
-                            showConfirmButton: false
-                        });
-                        $('#candidateModal').modal('hide');
-                        form[0].reset();
-                        location.reload();
-                    },
-                    error: function (xhr) {
-                        handleAjaxValidationErrors(xhr, form);
+            $('#candidateForm').on('submit', function (e) {
+                e.preventDefault();
+                let form = $(this);
+                let url = form.attr('action');
+                let formData = new FormData(this);
+
+                // Clear previous errors
+                form.find('.error-message').remove();
+
+                let hasErrors = false;
+
+                // ✅ Required fields validation
+                let requiredFields = [
+                    { name: 'first_name', message: 'First name is required.' },
+                    { name: 'last_name', message: 'Last name is required.' },
+                    { name: 'email', message: 'Email is required.' },
+                    { name: 'phone_number', message: 'Phone number is required.' },
+                    { name: 'ectc_per_month', message: 'Expected CTC per month is required.' },
+                    { name: 'candidate_source', message: 'Candidate source is required.' },
+                    { name: 'applied_designation', message: 'Applied designation is required.' },
+                    { name: 'stream', message: 'Stream is required.' }
+                ];
+
+                requiredFields.forEach(field => {
+                    let input = form.find('[name="' + field.name + '"]');
+                    if (input.length && !input.val().trim()) {
+                        $('<div class="text-danger small error-message">' + field.message + '</div>').insertAfter(input);
+                        hasErrors = true;
                     }
                 });
-            }
-        });
+
+                // ✅ Email validation
+                let emailInput = form.find('[name="email"]');
+                let emailVal = emailInput.val().trim();
+                if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+                    $('<div class="text-danger small error-message">Please enter a valid email address.</div>').insertAfter(emailInput);
+                    hasErrors = true;
+                }
+
+                // ✅ Phone validation
+                let phoneInput = form.find('[name="phone_number"]');
+                let phoneVal = phoneInput.val().trim();
+                const phoneRegex = /^[0-9]{10}$/;
+                if (!phoneRegex.test(phoneVal)) {
+                    $('<div class="text-danger small error-message">Enter a valid 10-digit phone number.</div>').insertAfter(phoneInput);
+                    hasErrors = true;
+                }
+
+                // ✅ Alternate phone validation
+                let alternateInput = form.find('[name="alternate_phone_number"]');
+                let alternateVal = alternateInput.val().trim();
+                if (alternateVal) {
+                    if (!phoneRegex.test(alternateVal)) {
+                        $('<div class="text-danger small error-message">Enter a valid 10-digit alternate phone number.</div>').insertAfter(alternateInput);
+                        hasErrors = true;
+                    } else if (alternateVal === phoneVal) {
+                        $('<div class="text-danger small error-message">Alternate phone number must be different from phone number.</div>').insertAfter(alternateInput);
+                        hasErrors = true;
+                    }
+                }
+
+                // ✅ LinkedIn validation
+                let linkedinInput = form.find('[name="linkedin_url"]');
+                let linkedinVal = linkedinInput.val().trim();
+                const urlRegex = /^(https?:\/\/)([\w-]+\.)+[\w-]+(\/[\w\-._~:/?#[\]@!$&'()*+,;=]*)?$/;
+                if (linkedinVal && !urlRegex.test(linkedinVal)) {
+                    $('<div class="text-danger small error-message">The linkedin url field must be a valid URL e.g. https://www.linkedin.com/</div>').insertAfter(linkedinInput);
+                    hasErrors = true;
+                }
+
+                // ✅ Total experience validation
+                let expYearsInput = form.find('[name="total_experience_years"]');
+                let expMonthsInput = form.find('[name="total_experience_months"]');
+                let expYearsRaw = expYearsInput.val().trim();
+                let expMonthsRaw = expMonthsInput.val().trim();
+                let expYearsVal = expYearsRaw !== "" ? parseInt(expYearsRaw) : null;
+                let expMonthsVal = expMonthsRaw !== "" ? parseInt(expMonthsRaw) : null;
+                if (expYearsVal !== null && expMonthsVal !== null && expYearsVal === 0 && expMonthsVal === 0) {
+                    $('<div class="text-danger small error-message">Enter at least 1 year or 1 month of total experience.</div>').insertAfter(expYearsInput);
+                    hasErrors = true;
+                }
+                if (expMonthsVal !== null && (expMonthsVal < 0 || expMonthsVal > 11)) {
+                    $('<div class="text-danger small error-message">Total experience months must be between 0 and 11.</div>').insertAfter(expMonthsInput);
+                    hasErrors = true;
+                }
+
+                // ✅ Resume file validation
+                let resumeInput = form.find('[name="resume"]');
+                let resumeFile = resumeInput[0].files[0];
+                if (resumeFile) {
+                    let maxSizeMB = 2;
+                    let maxSizeBytes = maxSizeMB * 1024 * 1024;
+                    if (resumeFile.size > maxSizeBytes) {
+                        $('<div class="text-danger small error-message">File size should not exceed ' + maxSizeMB + ' MB.</div>').insertAfter(resumeInput);
+                        hasErrors = true;
+                    }
+                }
+
+                // ✅ Skill validation
+                let hasSkillErrors = false;
+                $('.skill-item').each(function () {
+                    const skillSelect = $(this).find('select');
+                    const expYears = $(this).find('input[name*="[exp_years]"]');
+                    const expMonths = $(this).find('input[name*="[exp_months]"]');
+                    const skillVal = skillSelect.val();
+                    const yearsVal = expYears.val();
+                    const monthsVal = expMonths.val();
+
+                    if (!skillVal && (!yearsVal || yearsVal == 0) && (!monthsVal || monthsVal == 0)) {
+                        $('<div class="text-danger small error-message">Please fill this skill row or remove it.</div>').insertAfter(skillSelect);
+                        hasSkillErrors = true;
+                        return;
+                    }
+                    if (skillVal) {
+                        if ((parseInt(yearsVal) === 0 || !yearsVal) && (parseInt(monthsVal) === 0 || !monthsVal)) {
+                            $('<div class="text-danger small error-message">Enter at least 1 year or 1 month of experience for this skill.</div>').insertAfter(expYears);
+                            hasSkillErrors = true;
+                        }
+                    } else {
+                        if ((yearsVal && yearsVal > 0) || (monthsVal && monthsVal > 0)) {
+                            $('<div class="text-danger small error-message">Please select a skill name for these experience values.</div>').insertAfter(skillSelect);
+                            hasSkillErrors = true;
+                        }
+                    }
+                    if (monthsVal !== "" && (parseInt(monthsVal) < 0 || parseInt(monthsVal) > 11)) {
+                        $('<div class="text-danger small error-message">Months must be between 0 and 11.</div>').insertAfter(expMonths);
+                        hasSkillErrors = true;
+                    }
+                });
+
+                // ✅ Scroll to first error
+                if (hasErrors || hasSkillErrors) {
+                    let firstError = form.find('.error-message').first();
+                    if (firstError.length) {
+                        let modalBody = form.closest('.modal-body');
+                        modalBody.animate({
+                            scrollTop: firstError.offset().top - modalBody.offset().top + modalBody.scrollTop() - 40
+                        }, 300);
+                    }
+                    return false;
+                }
+
+                // ✅ Check email uniqueness before upload
+                $.post(HRP_URL + 'candidates/check-email-exists', {
+                    email: emailVal,
+                    _token: $('meta[name="csrf-token"]').attr('content')
+                }, function (response) {
+                    if (response.exists) {
+                        $('<div class="text-danger small error-message">The email has already been taken.</div>').insertAfter(emailInput);
+                        let modalBody = form.closest('.modal-body');
+                        modalBody.animate({
+                            scrollTop: emailInput.offset().top - modalBody.offset().top + modalBody.scrollTop() - 40
+                        }, 300);
+                        return false;
+                    } else {
+                        jQuery('.ApWait').show();
+
+                        // ✅ Stuck upload detection and friendly error
+                        let uploadTimeout;
+                        let uploadRequest = $.ajax({
+                            type: 'POST',
+                            url: url,
+                            data: formData,
+                            processData: false,
+                            contentType: false,
+                            timeout: 30000, // 30 seconds
+
+                            xhr: function () {
+                                let xhr = new window.XMLHttpRequest();
+                                xhr.upload.addEventListener("progress", function (evt) {
+                                    if (evt.lengthComputable) {
+                                        let percentComplete = Math.round((evt.loaded / evt.total) * 100);
+                                        console.log(percentComplete + '% uploaded');
+                                    }
+                                }, false);
+                                return xhr;
+                            },
+                            success: function () {
+                                clearTimeout(uploadTimeout);
+                                jQuery('.ApWait').hide();
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Success',
+                                    text: 'Candidate added successfully.',
+                                    timer: 1500,
+                                    showConfirmButton: false
+                                });
+                                $('#candidateModal').modal('hide');
+                                form[0].reset();
+                                location.reload();
+                            },
+                            error: function (xhr, textStatus) {
+                                clearTimeout(uploadTimeout);
+                                jQuery('.ApWait').hide();
+
+                                // Clear previous stuck upload error
+                                form.find('.resume-upload-error').remove();
+
+                                if (textStatus === 'timeout') {
+                                    $('<div class="text-danger small error-message resume-upload-error">Upload is taking too long. Please try again.</div>').insertAfter(resumeInput);
+                                } else {
+                                    handleAjaxValidationErrors(xhr, form);
+                                }
+                            }
+                        });
+
+                        // Failsafe manual abort after 35 sec
+                        uploadTimeout = setTimeout(() => {
+                            uploadRequest.abort(); // triggers timeout error
+                        }, 35000);
+                    }
+                });
+            });
+
+
     });
 
-});
-function handleAjaxValidationErrors(xhr, form) {
-    Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Something went wrong. Please try again.',
-    });
-}
+    function handleAjaxValidationErrors(xhr, form) {
+        jQuery('.ApWait').hide(); 
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Something went wrong. Please try again.',
+        });
+    }
 </script>
 <script>
     function limitInput(input) {
