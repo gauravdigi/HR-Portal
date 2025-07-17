@@ -14,7 +14,7 @@ class Employee extends Model
 
     protected $fillable = [
         'digi_id', 'gender', 'dob','celb_dob',
-        'blood_group', 'phone', 'is_approved', 'emergency_contacts', 'official_email', 'email', 'profile_image', 'voter_id',
+        'blood_group', 'phone', 'is_approved', 'linkedin_url', 'emergency_contacts', 'official_email', 'email', 'profile_image', 'voter_id',
         'pan', 'aadhar', 'designation', 'team_lead', 'joining_date',
         'exp_years', 'exp_months', 'salary', 'inc_years', 'inc_months',
         'probation_end', 'release_date', 'address_perm', 'state_perm', 'city_perm',

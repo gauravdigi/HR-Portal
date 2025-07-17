@@ -101,7 +101,8 @@
                                     <p class="mb-2"><strong>Gender:</strong>@if($employee->gender) {{ $employee->gender }}@endif</p>
                                     <p class="mb-2"><strong>Blood Group:</strong>@if($employee->blood_group) {{ $employee->blood_group }}@endif</p>
                                     <p class="mb-2"><strong>PAN Card:</strong>@if($employee->pan) {{ $employee->pan }}@endif</p>
-                                    <p class="mb-2"><strong>Aadhar Card:</strong>@if($employee->aadhar) {{ $employee->aadhar }}@endif</p>     
+                                    <p class="mb-2"><strong>Aadhar Card:</strong>@if($employee->aadhar) {{ $employee->aadhar }}@endif</p> 
+                                     <p class="mb-2"><strong>Linkedin URL:</strong>@if($employee->linkedin_url) <a href="{{ $employee->linkedin_url }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill"><i class="bi bi-linkedin me-1"></i> View LinkedIn Profile</a>@endif</p>    
                                 </div>
                                 <div class="col-sm-6">
                                     <p class="mb-2"><strong>Official Email:</strong>@if($employee->user_email) {{ $employee->user_email }}@endif</p> 

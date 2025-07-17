@@ -122,7 +122,10 @@
 
 
 				    <div class="h5">Other Information</div>
-
+				    <div class="col-md-4">
+                        <label class="form-label">LinkedIn URL</label>
+                        <input type="url" name="linkedin_url" class="form-control">
+                    </div>
 				    <div class="col-md-4">
 			            <label class="form-label">Gender *</label>
 			            <select name="gender" class="form-control" required>
@@ -977,6 +980,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     isValid = false;
                     $(incMonthsInput).after('<span class="error text-danger">Please enter at least 0 Months.</span>');
                 }
+            }
+
+            let linkedinInput = $('[name="linkedin_url"]'); // jQuery object
+            let linkedinVal = linkedinInput.val().trim();   // .val() now works
+
+            const urlRegex = /^(https?:\/\/)([\w-]+\.)+[\w-]+(\/[\w\-._~:/?#[\]@!$&'()*+,;=]*)?$/;
+
+            if (linkedinVal && !urlRegex.test(linkedinVal)) {
+                $(linkedinInput).after('<span class="error text-danger">The linkedin url field must be a valid URL e.g. https://www.linkedin.com/</span>');
+                isValid = false;
             }
 
 				// Custom fields (PAN, Aadhar, etc.)
